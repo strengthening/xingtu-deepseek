@@ -363,6 +363,20 @@ async function boot(): Promise<void> {
     showNotice(`星座连线未加载：${constellationErrors[0]}`, 9000);
   }
 
+  // 默认观测时刻是「当前时间」（PROMPT 要求）。如果此刻正好是白天，
+  // 打开后会看到一片明亮的天空 —— 这是正确的物理结果，但很容易被误认为
+  // 「星星没渲染出来」。所以白天启动时主动提示一句怎么看到星空。
+  window.setTimeout(() => {
+    const sunAltitude = currentCtx.sun.altitudeDeg;
+    if (sunAltitude > -2) {
+      showNotice(
+        `现在是白天，太阳高度 ${sunAltitude.toFixed(0)}°，天空被天光盖住了。` +
+          `把「时间流速」调到 1 时/秒，或直接改观测时刻，就能看到星空。`,
+        11000,
+      );
+    }
+  }, 1400);
+
   // 状态 → 图层可见性
   state.subscribe((next) => {
     lines.setVisible('eq-grid', next.display.showEquatorialGrid);
