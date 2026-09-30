@@ -33,10 +33,7 @@ function fullscreenQuad(): BufferGeometry {
     'position',
     new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3),
   );
-  geometry.setAttribute(
-    'uv',
-    new BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2),
-  );
+  geometry.setAttribute('uv', new BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
   geometry.setIndex([0, 1, 2, 0, 2, 3]);
   return geometry;
 }

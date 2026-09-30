@@ -7,7 +7,13 @@
  * 不要看起来像禁用状态」的要求。
  */
 
-import { findPreset, LOCATION_PRESETS, presetsOf, type AppState, type AppStateShape } from '../state';
+import {
+  findPreset,
+  LOCATION_PRESETS,
+  presetsOf,
+  type AppState,
+  type AppStateShape,
+} from '../state';
 import {
   formatRate,
   formatUtcOffset,
@@ -257,7 +263,8 @@ export class ControlPanel {
     header.addEventListener('click', () => {
       this.element.classList.toggle('is-collapsed');
       const toggle = header.querySelector('.panel-toggle');
-      if (toggle) toggle.textContent = this.element.classList.contains('is-collapsed') ? '展开' : '收起';
+      if (toggle)
+        toggle.textContent = this.element.classList.contains('is-collapsed') ? '展开' : '收起';
     });
 
     this.element = el('div', { class: 'panel control-panel' }, [header, body]);

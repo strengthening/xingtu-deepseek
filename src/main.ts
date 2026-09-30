@@ -18,7 +18,12 @@ import {
 } from './render/grids';
 import { pickObjects } from './render/picking';
 import { dragToAngles, normalizeViewAngles, unprojectFromNdc } from './render/viewCamera';
-import { computeSkyContext, horizonToEquatorial, type SkyContext, type Viewport } from './skyContext';
+import {
+  computeSkyContext,
+  horizonToEquatorial,
+  type SkyContext,
+  type Viewport,
+} from './skyContext';
 import { ControlPanel } from './ui/controls';
 import { formatMagnitude, formatRate, formatZonedDateTime } from './ui/format';
 import { InfoCard } from './ui/infoCard';
@@ -315,6 +320,45 @@ async function boot(): Promise<void> {
     ]),
   );
 
+  // 数据署名：PROMPT 要求在网页页脚注明各数据来源与许可证。
+  // 星表与星座连线都是 CC BY-SA 4.0（署名 + 相同方式共享），
+  // 银河全景是 All rights reserved（署名 + 仅限非商业用途），
+  // 所以这块不是装饰，是许可证义务。默认收起，避免遮挡星空。
+  const footerDetails = el('div', { class: 'data-footer-details' }, [
+    el('div', { class: 'data-footer-row' }, [
+      el('span', { class: 'data-footer-key' }, ['恒星与自行']),
+      el('span', {}, [
+        'AT-HYG v3.2 © David Nash，CC BY-SA 4.0（上游：Tycho-2 / Hipparcos-2 / Gaia DR3）',
+      ]),
+    ]),
+    el('div', { class: 'data-footer-row' }, [
+      el('span', { class: 'data-footer-key' }, ['星座与星名']),
+      el('span', {}, ['Stellarium skycultures，CC BY-SA 4.0']),
+    ]),
+    el('div', { class: 'data-footer-row' }, [
+      el('span', { class: 'data-footer-key' }, ['银河全景']),
+      el('span', {}, [
+        '© 2000-2017 Axel Mellinger，All rights reserved；经 CDS HiPS CDS/P/Mellinger/color 重投影，仅限非商业教育 / 演示用途',
+      ]),
+    ]),
+    el('div', { class: 'data-footer-row' }, [
+      el('span', { class: 'data-footer-key' }, ['其他']),
+      el('span', {}, ['astronomy-engine (MIT) · Three.js (MIT) · 本项目代码 MIT']),
+    ]),
+  ]);
+  footerDetails.style.display = 'none';
+
+  const footerToggle = el('button', { class: 'data-footer-toggle', type: 'button' }, [
+    '数据来源与许可证',
+  ]);
+  const dataFooter = el('div', { class: 'data-footer' }, [footerToggle, footerDetails]);
+  footerToggle.addEventListener('click', () => {
+    const open = footerDetails.style.display !== 'none';
+    footerDetails.style.display = open ? 'none' : '';
+    dataFooter.classList.toggle('is-open', !open);
+  });
+  overlayRoot.appendChild(dataFooter);
+
   if (constellationErrors.length > 0) {
     showNotice(`星座连线未加载：${constellationErrors[0]}`, 9000);
   }
@@ -367,7 +411,9 @@ async function boot(): Promise<void> {
     if (activePointers.size >= 2) {
       const dist = pointerDistance();
       if (pinchDistance > 0 && dist > 0) {
-        state.update({ view: { fovDeg: clampFov(state.value.view.fovDeg * (pinchDistance / dist)) } });
+        state.update({
+          view: { fovDeg: clampFov(state.value.view.fovDeg * (pinchDistance / dist)) },
+        });
         needsPlan = true;
         scheduleUrlSync();
       }
@@ -555,8 +601,7 @@ async function boot(): Promise<void> {
     }
 
     const preset = findPreset(state.value.observer.locationId);
-    hud.location.textContent =
-      `${preset.name} · ${preset.latitudeDeg.toFixed(2)}°, ${preset.longitudeDeg.toFixed(2)}°`;
+    hud.location.textContent = `${preset.name} · ${preset.latitudeDeg.toFixed(2)}°, ${preset.longitudeDeg.toFixed(2)}°`;
     hud.time.textContent =
       `${formatZonedDateTime(currentCtx.date, preset.timeZone)}` +
       `${state.value.time.paused ? ' · 已暂停' : ` · ${formatRate(state.value.time.rate)}`}`;

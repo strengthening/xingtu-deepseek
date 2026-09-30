@@ -9,10 +9,7 @@ import { MakeTime, Observer } from 'astronomy-engine';
 
 import { observerVelocityOverC } from './astro/aberration';
 import { computeSkyGlow, type SkyGlow } from './astro/atmosphere';
-import {
-  azAltToHorizon,
-  j2000ToHorizonMatrix,
-} from './astro/coordinates';
+import { azAltToHorizon, j2000ToHorizonMatrix } from './astro/coordinates';
 import { mat3Apply, mat3Transpose, normalize, type Mat3, type Vec3 } from './astro/vec3';
 import {
   computeSolarSystem,
@@ -136,7 +133,10 @@ export function computeSkyContext(state: AppStateShape, viewport: Viewport): Sky
 }
 
 /** 天体「亮边」方向在地平切平面上的分量，供月相着色器使用 */
-export function limbDirectionOf(body: SolarSystemPosition, sun: SolarSystemPosition): {
+export function limbDirectionOf(
+  body: SolarSystemPosition,
+  sun: SolarSystemPosition,
+): {
   east: number;
   north: number;
 } {

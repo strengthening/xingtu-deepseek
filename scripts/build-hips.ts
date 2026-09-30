@@ -147,7 +147,9 @@ async function fetchWithRetry(url: string, attempts = 5): Promise<Uint8Array> {
       return buf;
     } catch (err) {
       lastError = err;
-      process.stdout.write(`  第 ${i} 次尝试失败：${err instanceof Error ? err.message : String(err)}\n`);
+      process.stdout.write(
+        `  第 ${i} 次尝试失败：${err instanceof Error ? err.message : String(err)}\n`,
+      );
       if (i < attempts) await new Promise((r) => setTimeout(r, 2000 * i));
     }
   }
@@ -226,14 +228,22 @@ async function main(): Promise<void> {
   process.stdout.write(`  贴图文件  : ${relative(ROOT, abs)}\n`);
   process.stdout.write(`  大小      : ${mb(buf.byteLength)}\n`);
   process.stdout.write(`  WCS       : CTYPE = ${wcs.ctype1} / ${wcs.ctype2}\n`);
-  process.stdout.write(`              CRPIX = (${wcs.crpix1}, ${wcs.crpix2})  CRVAL = (${wcs.crval1}, ${wcs.crval2})\n`);
-  process.stdout.write(`              CDELT = (${wcs.cdelt1}, ${wcs.cdelt2})  LONPOLE = ${wcs.lonpole}\n`);
-  process.stdout.write(`  UV 映射   : u = ${meta.mapping.uOffset} ${meta.mapping.uSign < 0 ? '-' : '+'} lon/360, v = (lat+90)/180\n`);
+  process.stdout.write(
+    `              CRPIX = (${wcs.crpix1}, ${wcs.crpix2})  CRVAL = (${wcs.crval1}, ${wcs.crval2})\n`,
+  );
+  process.stdout.write(
+    `              CDELT = (${wcs.cdelt1}, ${wcs.cdelt2})  LONPOLE = ${wcs.lonpole}\n`,
+  );
+  process.stdout.write(
+    `  UV 映射   : u = ${meta.mapping.uOffset} ${meta.mapping.uSign < 0 ? '-' : '+'} lon/360, v = (lat+90)/180\n`,
+  );
   process.stdout.write(`  版权      : ${meta.license.copyright}\n`);
   process.stdout.write(`  ⚠️  该贴图非 MIT，仅限非商业用途，详见 README\n`);
 }
 
 main().catch((err: unknown) => {
-  process.stderr.write(`预处理失败：${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+  process.stderr.write(
+    `预处理失败：${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+  );
   process.exitCode = 1;
 });

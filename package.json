@@ -19,7 +19,8 @@
     "data:stars": "tsx scripts/build-stars.ts",
     "data:constellations": "tsx scripts/build-constellations.ts",
     "data:hips": "tsx scripts/build-hips.ts",
-    "data:all": "pnpm run data:stars && pnpm run data:constellations && pnpm run data:hips"
+    "data:all": "tsx scripts/build-stars.ts && tsx scripts/build-constellations.ts && tsx scripts/build-hips.ts",
+    "data:download": "bash scripts/download-raw-data.sh"
   },
   "dependencies": {
     "astronomy-engine": "^2.1.19",

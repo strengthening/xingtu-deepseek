@@ -57,10 +57,40 @@ const OUT_DIR = join(ROOT, 'public', 'data', 'stars');
 const AT_HYG_EPOCH_DELTA_YEARS = 8.75;
 
 const CSV_COLUMNS = [
-  'id', 'tyc', 'gaia', 'hyg', 'hip', 'hd', 'hr', 'gl', 'bayer', 'flam',
-  'con', 'proper', 'ra', 'dec', 'pos_src', 'dist', 'x0', 'y0', 'z0', 'dist_src',
-  'mag', 'absmag', 'ci', 'mag_src', 'rv', 'rv_src', 'pm_ra', 'pm_dec', 'pm_src',
-  'vx', 'vy', 'vz', 'spect', 'spect_src',
+  'id',
+  'tyc',
+  'gaia',
+  'hyg',
+  'hip',
+  'hd',
+  'hr',
+  'gl',
+  'bayer',
+  'flam',
+  'con',
+  'proper',
+  'ra',
+  'dec',
+  'pos_src',
+  'dist',
+  'x0',
+  'y0',
+  'z0',
+  'dist_src',
+  'mag',
+  'absmag',
+  'ci',
+  'mag_src',
+  'rv',
+  'rv_src',
+  'pm_ra',
+  'pm_dec',
+  'pm_src',
+  'vx',
+  'vy',
+  'vz',
+  'spect',
+  'spect_src',
 ] as const;
 
 const COL = Object.fromEntries(CSV_COLUMNS.map((name, i) => [name, i])) as Record<
@@ -83,10 +113,28 @@ interface TierConfig {
 }
 
 const TIERS: readonly TierConfig[] = [
-  { id: 'A', label: '全天整体加载 · mag < 6.5（肉眼可见）', magMin: -Infinity, magMax: 6.5, nside: 0 },
+  {
+    id: 'A',
+    label: '全天整体加载 · mag < 6.5（肉眼可见）',
+    magMin: -Infinity,
+    magMax: 6.5,
+    nside: 0,
+  },
   { id: 'B', label: '全天整体加载 · 6.5 ≤ mag < 8.5', magMin: 6.5, magMax: 8.5, nside: 0 },
-  { id: 'C', label: 'HEALPix nside=8 切片 · 8.5 ≤ mag < 10.5', magMin: 8.5, magMax: 10.5, nside: 8 },
-  { id: 'D', label: 'HEALPix nside=16 切片 · mag ≥ 10.5', magMin: 10.5, magMax: Infinity, nside: 16 },
+  {
+    id: 'C',
+    label: 'HEALPix nside=8 切片 · 8.5 ≤ mag < 10.5',
+    magMin: 8.5,
+    magMax: 10.5,
+    nside: 8,
+  },
+  {
+    id: 'D',
+    label: 'HEALPix nside=16 切片 · mag ≥ 10.5',
+    magMin: 10.5,
+    magMax: Infinity,
+    nside: 16,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -283,16 +331,7 @@ function toNumber(value: string | undefined): number {
 type NamedStarTuple = (string | number | null)[];
 
 /** 上面的字段顺序，会写进 manifest 供运行时对照 */
-const NAMED_STAR_FIELDS = [
-  'name',
-  'bayer',
-  'flam',
-  'con',
-  'hip',
-  'hd',
-  'hr',
-  'spect',
-] as const;
+const NAMED_STAR_FIELDS = ['name', 'bayer', 'flam', 'con', 'hip', 'hd', 'hr', 'spect'] as const;
 
 /** 只有 mag 亮于这个值的无名字星才保留星表编号，控制 JSON 体积 */
 const CATALOG_META_MAG_LIMIT = 8.0;
@@ -464,7 +503,9 @@ async function main(): Promise<void> {
   }
 
   const readSeconds = (performance.now() - t0) / 1000;
-  process.stdout.write(`读取完毕：${totalRows.toLocaleString()} 行，用时 ${readSeconds.toFixed(1)}s\n`);
+  process.stdout.write(
+    `读取完毕：${totalRows.toLocaleString()} 行，用时 ${readSeconds.toFixed(1)}s\n`,
+  );
 
   // ---- 落盘 ----
   mkdirSync(OUT_DIR, { recursive: true });
@@ -478,11 +519,7 @@ async function main(): Promise<void> {
   for (const tileMap of buckets.values()) {
     for (const acc of tileMap.values()) {
       for (let i = 0; i < acc.count; i++) {
-        const len = Math.hypot(
-          acc.pos[i * 3]!,
-          acc.pos[i * 3 + 1]!,
-          acc.pos[i * 3 + 2]!,
-        );
+        const len = Math.hypot(acc.pos[i * 3]!, acc.pos[i * 3 + 1]!, acc.pos[i * 3 + 2]!);
         const err = Math.abs(len - 1);
         if (err > 1e-4) {
           nonUnitPositions++;
@@ -520,7 +557,12 @@ async function main(): Promise<void> {
       const abs = join(OUT_DIR, rel);
       mkdirSync(dirname(abs), { recursive: true });
       writeFileSync(abs, bytes);
-      files.push({ file: rel.split('\\').join('/'), bytes: bytes.byteLength, count: acc.count, pix });
+      files.push({
+        file: rel.split('\\').join('/'),
+        bytes: bytes.byteLength,
+        count: acc.count,
+        pix,
+      });
       tierCount += acc.count;
       tierBytes += bytes.byteLength;
     }
@@ -583,7 +625,9 @@ async function main(): Promise<void> {
        * 全天档只有一个文件，此时为空字符串。
        */
       pathTemplate:
-        t.nside === 0 ? `tier-${t.id.toLowerCase()}.bin` : `tier-${t.id.toLowerCase()}/nside${t.nside}/Npix{pix}.bin`,
+        t.nside === 0
+          ? `tier-${t.id.toLowerCase()}.bin`
+          : `tier-${t.id.toLowerCase()}/nside${t.nside}/Npix{pix}.bin`,
       /**
        * HEALPix 天区清单：`[天区号, 星数]`。
        * 用数组而不是对象，3072 个天区能省下几十万字符。
@@ -600,10 +644,14 @@ async function main(): Promise<void> {
   process.stdout.write('\n================ 分块统计 ================\n');
   for (const t of tierStats) {
     process.stdout.write(`\n档 ${t.id}：${t.label}\n`);
-    process.stdout.write(`  ${t.count.toLocaleString()} 颗星，${t.files.length} 个文件，合计 ${mb(t.bytes)}\n`);
+    process.stdout.write(
+      `  ${t.count.toLocaleString()} 颗星，${t.files.length} 个文件，合计 ${mb(t.bytes)}\n`,
+    );
     if (t.nside === 0) {
       for (const f of t.files) {
-        process.stdout.write(`    ${f.file.padEnd(28)} ${f.count.toLocaleString().padStart(10)} 颗  ${mb(f.bytes)}\n`);
+        process.stdout.write(
+          `    ${f.file.padEnd(28)} ${f.count.toLocaleString().padStart(10)} 颗  ${mb(f.bytes)}\n`,
+        );
       }
     } else {
       const sorted = [...t.files].sort((a, b) => b.count - a.count);
@@ -614,7 +662,9 @@ async function main(): Promise<void> {
       );
       process.stdout.write(`    最大的 3 个天区：\n`);
       for (const f of sorted.slice(0, 3)) {
-        process.stdout.write(`      Npix${String(f.pix).padStart(6)}  ${f.count.toLocaleString().padStart(7)} 颗  ${mb(f.bytes)}\n`);
+        process.stdout.write(
+          `      Npix${String(f.pix).padStart(6)}  ${f.count.toLocaleString().padStart(7)} 颗  ${mb(f.bytes)}\n`,
+        );
       }
       process.stdout.write(`    空天区（无星）：${nsideToNpix(t.nside) - t.files.length} 个\n`);
     }
@@ -624,18 +674,26 @@ async function main(): Promise<void> {
   process.stdout.write(`  星表总星数        : ${grandTotal.toLocaleString()}\n`);
   process.stdout.write(`  过滤掉的 Sol      : ${skippedSol}\n`);
   process.stdout.write(`  单位向量自检      : ✔ ${grandTotal.toLocaleString()} 颗全部通过\n`);
-  process.stdout.write(`  缺 B-V 的星        : ${missingCi.toLocaleString()}（用太阳色 0.65 兜底）\n`);
+  process.stdout.write(
+    `  缺 B-V 的星        : ${missingCi.toLocaleString()}（用太阳色 0.65 兜底）\n`,
+  );
   process.stdout.write(`  缺自行的星         : ${missingPm.toLocaleString()}\n`);
   process.stdout.write(`  有专名的星         : ${withProperName.toLocaleString()}\n`);
   process.stdout.write(`  有拜耳/弗兰斯蒂德号: ${withBayerOrFlamsteed.toLocaleString()}\n`);
-  process.stdout.write(`  star-names.json   : ${namedStars.size.toLocaleString()} 条，${mb(Buffer.byteLength(namesJson))}\n`);
+  process.stdout.write(
+    `  star-names.json   : ${namedStars.size.toLocaleString()} 条，${mb(Buffer.byteLength(namesJson))}\n`,
+  );
   process.stdout.write(`  manifest.json     : ${mb(Buffer.byteLength(manifestJson))}\n`);
-  process.stdout.write(`  数据总大小        : ${mb(grandBytes)}（另有 star-names.json + manifest.json）\n`);
+  process.stdout.write(
+    `  数据总大小        : ${mb(grandBytes)}（另有 star-names.json + manifest.json）\n`,
+  );
   process.stdout.write(`  输出目录          : ${relative(ROOT, OUT_DIR)}\n`);
   process.stdout.write(`  总用时            : ${((performance.now() - t0) / 1000).toFixed(1)}s\n`);
 }
 
 main().catch((err: unknown) => {
-  process.stderr.write(`预处理失败：${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+  process.stderr.write(
+    `预处理失败：${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+  );
   process.exitCode = 1;
 });

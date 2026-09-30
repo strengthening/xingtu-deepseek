@@ -17,11 +17,7 @@ import type { Vec3 } from '../astro/vec3';
  * @param decStepDeg 赤纬线间隔（度）
  * @param decLimit   赤经线画到多高的赤纬（避免在天极处挤成一团）
  */
-export function buildEquatorialGrid(
-  raStepDeg = 15,
-  decStepDeg = 15,
-  decLimit = 85,
-): Polyline[] {
+export function buildEquatorialGrid(raStepDeg = 15, decStepDeg = 15, decLimit = 85): Polyline[] {
   const lines: Polyline[] = [];
 
   // 赤经线（子午线）：固定赤经，赤纬从南到北

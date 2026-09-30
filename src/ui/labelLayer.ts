@@ -141,7 +141,8 @@ export class LabelLayer {
         // 只给有专名或拜耳/弗兰斯蒂德编号的星做标签
         if (!proper && !bayer && !flam) continue;
 
-        const chinese = identity.hip !== undefined ? this.chineseNames?.get(identity.hip) : undefined;
+        const chinese =
+          identity.hip !== undefined ? this.chineseNames?.get(identity.hip) : undefined;
         const greekBayer = formatBayer(bayer);
         const primary = chinese ?? proper ?? greekBayer ?? flam ?? '';
         if (!primary) continue;
@@ -207,7 +208,10 @@ export class LabelLayer {
         if (!ndc.visible || Math.abs(ndc.x) > 1.15 || Math.abs(ndc.y) > 1.15) continue;
         const x = (ndc.x * 0.5 + 0.5) * width;
         const y = (1 - (ndc.y * 0.5 + 0.5)) * height;
-        const radius = Math.max(8, ctx.pixelsPerProjectionUnit * (body.angularDiameterDeg / 57.29578) * 0.5);
+        const radius = Math.max(
+          8,
+          ctx.pixelsPerProjectionUnit * (body.angularDiameterDeg / 57.29578) * 0.5,
+        );
         this.place(`body-${body.key}`, body.nameZh, x, y + radius + 8, occupied, 'body');
       }
     }
@@ -238,7 +242,8 @@ export class LabelLayer {
         if (hor.z < 0.02) continue; // 地平线以下不标
 
         // 先做一次粗略的角距离剔除，省掉大部分投影运算
-        const dot = hor.x * ctx.centerHorizon.x + hor.y * ctx.centerHorizon.y + hor.z * ctx.centerHorizon.z;
+        const dot =
+          hor.x * ctx.centerHorizon.x + hor.y * ctx.centerHorizon.y + hor.z * ctx.centerHorizon.z;
         if (dot < cullCos) continue;
 
         const ndc = projectToNdc(hor, ctx.camera, ctx.fovDeg, ctx.aspect);
@@ -268,7 +273,12 @@ export class LabelLayer {
 
     const halfWidth = Math.max(22, text.length * (kind === 'compass' ? 9 : 7.5));
     const halfHeight = kind === 'star' ? 9 : 11;
-    const rect: Rect = { x0: x - halfWidth, y0: y - halfHeight, x1: x + halfWidth, y1: y + halfHeight };
+    const rect: Rect = {
+      x0: x - halfWidth,
+      y0: y - halfHeight,
+      x1: x + halfWidth,
+      y1: y + halfHeight,
+    };
 
     for (const other of occupied) {
       if (rect.x0 < other.x1 && rect.x1 > other.x0 && rect.y0 < other.y1 && rect.y1 > other.y0) {

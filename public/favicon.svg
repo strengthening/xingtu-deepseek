@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="#132038"/>
+      <stop offset="100%" stop-color="#05070c"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="35%" stop-color="#bcd8ff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#62a8ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <!-- 主星 -->
+  <circle cx="32" cy="27" r="15" fill="url(#glow)"/>
+  <circle cx="32" cy="27" r="4.6" fill="#ffffff"/>
+  <!-- 三颗陪星 -->
+  <circle cx="15" cy="45" r="1.9" fill="#cfe2ff" opacity="0.9"/>
+  <circle cx="49" cy="41" r="1.5" fill="#ffd8b0" opacity="0.85"/>
+  <circle cx="45" cy="14" r="1.2" fill="#bcd8ff" opacity="0.7"/>
+  <circle cx="19" cy="13" r="1.0" fill="#e8eefc" opacity="0.55"/>
+</svg>

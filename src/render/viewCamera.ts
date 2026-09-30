@@ -46,14 +46,26 @@ export function computeCameraBasis(azimuthDeg: number, altitudeDeg: number): Cam
 
   // 列向量分别是 right / up / forward
   const horizToCam = new Float64Array([
-    right.x, right.y, right.z,
-    up.x, up.y, up.z,
-    forward.x, forward.y, forward.z,
+    right.x,
+    right.y,
+    right.z,
+    up.x,
+    up.y,
+    up.z,
+    forward.x,
+    forward.y,
+    forward.z,
   ]);
   const camToHoriz = new Float64Array([
-    right.x, up.x, forward.x,
-    right.y, up.y, forward.y,
-    right.z, up.z, forward.z,
+    right.x,
+    up.x,
+    forward.x,
+    right.y,
+    up.y,
+    forward.y,
+    right.z,
+    up.z,
+    forward.z,
   ]);
 
   return { forward, right, up, horizToCam, camToHoriz };
@@ -76,9 +88,18 @@ export function projectToNdc(
   aspect: number,
 ): { x: number; y: number; visible: boolean } {
   const cam = {
-    x: basis.horizToCam[0]! * dirHoriz.x + basis.horizToCam[1]! * dirHoriz.y + basis.horizToCam[2]! * dirHoriz.z,
-    y: basis.horizToCam[3]! * dirHoriz.x + basis.horizToCam[4]! * dirHoriz.y + basis.horizToCam[5]! * dirHoriz.z,
-    z: basis.horizToCam[6]! * dirHoriz.x + basis.horizToCam[7]! * dirHoriz.y + basis.horizToCam[8]! * dirHoriz.z,
+    x:
+      basis.horizToCam[0]! * dirHoriz.x +
+      basis.horizToCam[1]! * dirHoriz.y +
+      basis.horizToCam[2]! * dirHoriz.z,
+    y:
+      basis.horizToCam[3]! * dirHoriz.x +
+      basis.horizToCam[4]! * dirHoriz.y +
+      basis.horizToCam[5]! * dirHoriz.z,
+    z:
+      basis.horizToCam[6]! * dirHoriz.x +
+      basis.horizToCam[7]! * dirHoriz.y +
+      basis.horizToCam[8]! * dirHoriz.z,
   };
   const rv = fovHalfTan(fovDeg);
   const denom = 1 + cam.z;
@@ -140,7 +161,10 @@ export function dragToAngles(
 }
 
 /** 把高度角夹在 [-90, 90]，方位角归一化到 [0, 360) */
-export function normalizeViewAngles(azimuthDeg: number, altitudeDeg: number): {
+export function normalizeViewAngles(
+  azimuthDeg: number,
+  altitudeDeg: number,
+): {
   azimuthDeg: number;
   altitudeDeg: number;
 } {

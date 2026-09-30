@@ -37,17 +37,9 @@ export function teffToChromaticity(teff: number): { x: number; y: number } {
 
   let x: number;
   if (t <= 4000) {
-    x =
-      (-0.2661239e9) / (t * t * t) -
-      0.2343589e6 / (t * t) +
-      (0.8776956e3 / t) +
-      0.17991;
+    x = -0.2661239e9 / (t * t * t) - 0.2343589e6 / (t * t) + 0.8776956e3 / t + 0.17991;
   } else {
-    x =
-      (-3.0258469e9) / (t * t * t) +
-      2.1070379e6 / (t * t) +
-      (0.2226347e3 / t) +
-      0.24039;
+    x = -3.0258469e9 / (t * t * t) + 2.1070379e6 / (t * t) + 0.2226347e3 / t + 0.24039;
   }
 
   let y: number;

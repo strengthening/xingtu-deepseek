@@ -42,11 +42,7 @@ import {
   vectorToRaDec,
 } from './coordinates';
 import { applyProperMotion } from './properMotion';
-import {
-  greenwichApparentSiderealTime,
-  julianYearsSinceJ2000,
-  localSiderealTime,
-} from './time';
+import { greenwichApparentSiderealTime, julianYearsSinceJ2000, localSiderealTime } from './time';
 import { angleBetween, mat3Apply, mat3Multiply, normalize, type Vec3 } from './vec3';
 
 /** 上海 */
@@ -81,22 +77,85 @@ interface Reference {
  * 命令：见 docs/precision-reference.md
  */
 const SKYFIELD_REFERENCE: readonly Reference[] = [
-  { time: '2025-01-01T16:00:00Z', star: 'Sirius', azimuthDeg: 181.8840422588253, altitudeDeg: 41.99870270820675 },
-  { time: '2025-01-01T16:00:00Z', star: 'Vega', azimuthDeg: 2.9759476273483436, altitudeDeg: -19.884353817400754 },
-  { time: '2025-01-01T16:00:00Z', star: 'Betelgeuse', azimuthDeg: 211.4837456703005, altitudeDeg: 62.875944867939836 },
-  { time: '2025-01-01T16:00:00Z', star: 'Polaris', azimuthDeg: 359.38558651579586, altitudeDeg: 31.57203697188329 },
-  { time: '2025-06-15T14:30:00Z', star: 'Sirius', azimuthDeg: 283.4382631688826, altitudeDeg: -52.24022177344294 },
-  { time: '2025-06-15T14:30:00Z', star: 'Vega', azimuthDeg: 65.50571184642546, altitudeDeg: 59.49288926937511 },
-  { time: '2025-06-15T14:30:00Z', star: 'Betelgeuse', azimuthDeg: 322.7493914925637, altitudeDeg: -44.03035749592741 },
-  { time: '2025-06-15T14:30:00Z', star: 'Polaris', azimuthDeg: 0.21918409605380593, altitudeDeg: 30.626686224461842 },
-  { time: '2024-03-20T12:00:00Z', star: 'Sirius', azimuthDeg: 202.87694760996115, altitudeDeg: 38.85567469296748 },
-  { time: '2024-03-20T12:00:00Z', star: 'Vega', azimuthDeg: 16.657467192642486, altitudeDeg: -17.405483730491166 },
-  { time: '2024-03-20T12:00:00Z', star: 'Betelgeuse', azimuthDeg: 236.94602136038014, altitudeDeg: 52.63046424619936 },
-  { time: '2024-03-20T12:00:00Z', star: 'Polaris', azimuthDeg: 359.28803507137843, altitudeDeg: 31.39478472113036 },
+  {
+    time: '2025-01-01T16:00:00Z',
+    star: 'Sirius',
+    azimuthDeg: 181.8840422588253,
+    altitudeDeg: 41.99870270820675,
+  },
+  {
+    time: '2025-01-01T16:00:00Z',
+    star: 'Vega',
+    azimuthDeg: 2.9759476273483436,
+    altitudeDeg: -19.884353817400754,
+  },
+  {
+    time: '2025-01-01T16:00:00Z',
+    star: 'Betelgeuse',
+    azimuthDeg: 211.4837456703005,
+    altitudeDeg: 62.875944867939836,
+  },
+  {
+    time: '2025-01-01T16:00:00Z',
+    star: 'Polaris',
+    azimuthDeg: 359.38558651579586,
+    altitudeDeg: 31.57203697188329,
+  },
+  {
+    time: '2025-06-15T14:30:00Z',
+    star: 'Sirius',
+    azimuthDeg: 283.4382631688826,
+    altitudeDeg: -52.24022177344294,
+  },
+  {
+    time: '2025-06-15T14:30:00Z',
+    star: 'Vega',
+    azimuthDeg: 65.50571184642546,
+    altitudeDeg: 59.49288926937511,
+  },
+  {
+    time: '2025-06-15T14:30:00Z',
+    star: 'Betelgeuse',
+    azimuthDeg: 322.7493914925637,
+    altitudeDeg: -44.03035749592741,
+  },
+  {
+    time: '2025-06-15T14:30:00Z',
+    star: 'Polaris',
+    azimuthDeg: 0.21918409605380593,
+    altitudeDeg: 30.626686224461842,
+  },
+  {
+    time: '2024-03-20T12:00:00Z',
+    star: 'Sirius',
+    azimuthDeg: 202.87694760996115,
+    altitudeDeg: 38.85567469296748,
+  },
+  {
+    time: '2024-03-20T12:00:00Z',
+    star: 'Vega',
+    azimuthDeg: 16.657467192642486,
+    altitudeDeg: -17.405483730491166,
+  },
+  {
+    time: '2024-03-20T12:00:00Z',
+    star: 'Betelgeuse',
+    azimuthDeg: 236.94602136038014,
+    altitudeDeg: 52.63046424619936,
+  },
+  {
+    time: '2024-03-20T12:00:00Z',
+    star: 'Polaris',
+    azimuthDeg: 359.28803507137843,
+    altitudeDeg: 31.39478472113036,
+  },
 ];
 
 /** 完整链路：J2000 恒星 → 地平方位角/高度角 */
-function apparentHorizontal(star: StarInput, date: Date): { azimuthDeg: number; altitudeDeg: number } {
+function apparentHorizontal(
+  star: StarInput,
+  date: Date,
+): { azimuthDeg: number; altitudeDeg: number } {
   const deltaYears = julianYearsSinceJ2000(date);
 
   let p = raDecToVector(star.raDeg, star.decDeg);
@@ -195,11 +254,7 @@ describe('岁差与章动', () => {
 
 describe('纯公式地平矩阵 vs astronomy-engine', () => {
   it('equToHorMatrix(纬度, 地方视恒星时) 与 Rotation_EQD_HOR 一致', () => {
-    const times = [
-      '2025-01-01T16:00:00Z',
-      '2024-03-20T12:00:00Z',
-      '2026-07-07T03:15:00Z',
-    ];
+    const times = ['2025-01-01T16:00:00Z', '2024-03-20T12:00:00Z', '2026-07-07T03:15:00Z'];
     for (const iso of times) {
       const date = new Date(iso);
       const lst = localSiderealTime(date, OBSERVER_LON);
@@ -226,7 +281,7 @@ describe('纯公式地平矩阵 vs astronomy-engine', () => {
     const date = new Date('2025-01-01T16:00:00Z');
     const gast = greenwichApparentSiderealTime(date);
     const lst = localSiderealTime(date, OBSERVER_LON);
-    const expected = ((gast + OBSERVER_LON / 15) % 24 + 24) % 24;
+    const expected = (((gast + OBSERVER_LON / 15) % 24) + 24) % 24;
     expect(Math.abs(lst - expected)).toBeLessThan(1e-12);
   });
 });

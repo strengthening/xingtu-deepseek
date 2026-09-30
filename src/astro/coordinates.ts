@@ -17,17 +17,15 @@
  * 所以链路是：自行 →（J2000 单位向量）→ 岁差章动 → 光行差 → 地平。
  */
 
-import { Observer, Rotation_EQD_HOR, Rotation_EQJ_EQD, type RotationMatrix } from 'astronomy-engine';
+import {
+  Observer,
+  Rotation_EQD_HOR,
+  Rotation_EQJ_EQD,
+  type RotationMatrix,
+} from 'astronomy-engine';
 import { DEG, RAD } from './constants';
 import { localSiderealTime } from './time';
-import {
-  clamp,
-  cross,
-  mat3Multiply,
-  normalize,
-  type Mat3,
-  type Vec3,
-} from './vec3';
+import { clamp, cross, mat3Multiply, normalize, type Mat3, type Vec3 } from './vec3';
 
 /** 赤经赤纬（度）→ 单位向量（赤道坐标系） */
 export function raDecToVector(raDeg: number, decDeg: number): Vec3 {
@@ -107,9 +105,15 @@ export function rotationToMat3(rotation: RotationMatrix): Mat3 {
     return value;
   };
   return new Float64Array([
-    at(0, 0), at(1, 0), at(2, 0),
-    at(0, 1), at(1, 1), at(2, 1),
-    at(0, 2), at(1, 2), at(2, 2),
+    at(0, 0),
+    at(1, 0),
+    at(2, 0),
+    at(0, 1),
+    at(1, 1),
+    at(2, 1),
+    at(0, 2),
+    at(1, 2),
+    at(2, 2),
   ]);
 }
 
@@ -187,7 +191,7 @@ export function bearingBetween(from: Vec3, to: Vec3): number {
     nt.x * east.x + nt.y * east.y + nt.z * east.z,
     nt.x * north.x + nt.y * north.y + nt.z * north.z,
   );
-  return ((bearing * RAD) % 360 + 360) % 360;
+  return (((bearing * RAD) % 360) + 360) % 360;
 }
 
 /** 便捷封装：给定经纬度与时间，返回 J2000 → 地平 的矩阵 */

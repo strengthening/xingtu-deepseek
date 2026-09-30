@@ -140,7 +140,11 @@ export function moonSkyBrightness(input: SkyBrightnessInput): number {
 }
 
 /** 太阳系天体本身在大气中的消光（用于月亮/行星亮度） */
-export function bodyExtinctionFactor(altitudeDeg: number, heightM: number, density: number): number {
+export function bodyExtinctionFactor(
+  altitudeDeg: number,
+  heightM: number,
+  density: number,
+): number {
   if (density <= 0) return 1;
   const dm = extinctionMagnitudes(altitudeDeg, heightM) * density;
   return Math.pow(10, -0.4 * dm);

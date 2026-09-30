@@ -18,7 +18,6 @@ import {
   LinearMipmapLinearFilter,
   Mesh,
   NoColorSpace,
-
   ShaderMaterial,
   Texture,
   TextureLoader,
@@ -73,16 +72,16 @@ export class BackgroundLayer {
       uHasMilkyWay: { value: 0 },
       uMilkyWayStrength: { value: 0.85 },
       uMilkyWayUv: { value: new Float32Array([0.5, -1]) },
-      uNightColor: { value: new Float32Array([0.30, 0.42, 0.68]) },
+      uNightColor: { value: new Float32Array([0.3, 0.42, 0.68]) },
       uTwilightColor: { value: new Float32Array([0.55, 0.58, 0.85]) },
-      uMoonColor: { value: new Float32Array([0.72, 0.80, 0.98]) },
+      uMoonColor: { value: new Float32Array([0.72, 0.8, 0.98]) },
       uSkyNight: { value: 0.02 },
       uSkyTwilight: { value: 0 },
       uSkyMoon: { value: 0 },
       uMoonDirHoriz: { value: new Float32Array([0, 0, 0]) },
       // 地面：接近纯黑，带一点冷色，靠近地平线略亮
-      uGroundColor: { value: new Float32Array([0.012, 0.014, 0.020]) },
-      uGroundGlowColor: { value: new Float32Array([0.030, 0.034, 0.048]) },
+      uGroundColor: { value: new Float32Array([0.012, 0.014, 0.02]) },
+      uGroundGlowColor: { value: new Float32Array([0.03, 0.034, 0.048]) },
       uShowGround: { value: 1 },
     };
 

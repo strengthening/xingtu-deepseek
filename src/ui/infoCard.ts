@@ -203,7 +203,10 @@ export class InfoCard {
       row('视直径', angular),
       row('赤经 (of date)', formatRa(body.raDeg)),
       row('赤纬 (of date)', formatAngle(body.decDeg)),
-      row('地平高度', `${body.altitudeDeg.toFixed(2)}°${body.altitudeDeg < 0 ? '（地平线下）' : ''}`),
+      row(
+        '地平高度',
+        `${body.altitudeDeg.toFixed(2)}°${body.altitudeDeg < 0 ? '（地平线下）' : ''}`,
+      ),
       row('方位角', `${body.azimuthDeg.toFixed(2)}°`),
     ];
 

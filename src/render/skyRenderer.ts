@@ -219,13 +219,10 @@ export class SkyRenderer {
       // 暮光与白天迅速顶到上限，经色调映射后成为明亮的天空。
       u.uSkyNight.value = Math.min(relative, 3) * SKY_EXPOSURE;
       u.uSkyTwilight.value = Math.min(
-        (glow.twilightFraction * relative) * SKY_EXPOSURE,
+        glow.twilightFraction * relative * SKY_EXPOSURE,
         SKY_HDR_LIMIT,
       );
-      u.uSkyMoon.value = Math.min(
-        (glow.moonFraction * relative) * SKY_EXPOSURE,
-        SKY_HDR_LIMIT,
-      );
+      u.uSkyMoon.value = Math.min(glow.moonFraction * relative * SKY_EXPOSURE, SKY_HDR_LIMIT);
     }
 
     this.background.setMilkyWayEnabled(state.display.showMilkyWay);
@@ -285,7 +282,11 @@ export class SkyRenderer {
         magnitude: body.magnitude,
       });
     }
-    this.bodyLayer.update(inputs, ctx.pixelsPerProjectionUnit, state.display.showSolarSystem ? 5 : 4);
+    this.bodyLayer.update(
+      inputs,
+      ctx.pixelsPerProjectionUnit,
+      state.display.showSolarSystem ? 5 : 4,
+    );
     this.bodyLayer.updateUniforms(ctx.camera.horizToCam, ctx.fovHalfTan, ctx.aspect);
     return inputs.length;
   }
