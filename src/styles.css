@@ -1,0 +1,191 @@
+/* 星图 xingtu —— 全局样式与基础 UI */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #05070c;
+  --panel-bg: rgba(14, 19, 30, 0.9);
+  --panel-border: rgba(120, 150, 200, 0.28);
+  --panel-border-strong: rgba(140, 180, 240, 0.55);
+  --text: #e8eefc;
+  --text-dim: #9fb0cd;
+  --text-strong: #ffffff;
+  --accent: #62a8ff;
+  --accent-soft: rgba(98, 168, 255, 0.18);
+  --accent-strong: #8cc4ff;
+  --warn: #ffcb6b;
+  --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+#sky-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+#sky-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+#label-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#ui-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#ui-root > * {
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------------ 加载遮罩 */
+
+#loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 45%, #101827 0%, #05070c 70%);
+  z-index: 100;
+  transition: opacity 0.5s ease;
+}
+
+#loading-overlay.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-box {
+  width: min(420px, 80vw);
+  text-align: center;
+}
+
+.loading-title {
+  font-size: 26px;
+  letter-spacing: 0.32em;
+  font-weight: 300;
+  color: var(--text-strong);
+  margin-bottom: 18px;
+  text-indent: 0.32em;
+}
+
+.loading-status {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+  min-height: 1.4em;
+}
+
+.loading-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #3d7fd6, #8cc4ff);
+  transition: width 0.25s ease;
+}
+
+/* ------------------------------------------------------------------ 面板 */
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-strong);
+}
+
+.panel-toggle {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.panel-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel.is-collapsed .panel-body {
+  display: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-value {
+  color: var(--accent-strong);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
