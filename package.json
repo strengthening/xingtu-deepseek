@@ -1,0 +1,41 @@
+{
+  "name": "xingtu",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "浏览器端星空 / 天象仪（Stellarium Web 风格）",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "data:stars": "tsx scripts/build-stars.ts",
+    "data:constellations": "tsx scripts/build-constellations.ts",
+    "data:hips": "tsx scripts/build-hips.ts",
+    "data:all": "pnpm run data:stars && pnpm run data:constellations && pnpm run data:hips"
+  },
+  "dependencies": {
+    "astronomy-engine": "^2.1.19",
+    "three": "^0.171.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "@types/three": "^0.171.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
+}

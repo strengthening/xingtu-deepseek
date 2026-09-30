@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>星图 xingtu · 浏览器星空天象仪</title>
+    <meta
+      name="description"
+      content="基于 Three.js 与 astronomy-engine 的浏览器端星空 / 天象仪，支持百万级星表、真实自行与光行差、地平坐标、日月行星与 HiPS 银河背景。"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="sky-canvas"></canvas>
+      <div id="label-layer" aria-hidden="true"></div>
+      <div id="ui-root"></div>
+      <div id="loading-overlay">
+        <div class="loading-box">
+          <div class="loading-title">星图 xingtu</div>
+          <div class="loading-status" id="loading-status">正在初始化…</div>
+          <div class="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
+        </div>
+      </div>
+    </div>
+    <noscript>本项目需要启用 JavaScript 与 WebGL。</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,4 @@
+# pnpm 11 起，依赖构建脚本的白名单从 package.json 的 "pnpm" 字段迁移到这里。
+# esbuild 需要执行安装脚本以链接平台二进制（vite / vitest 依赖它）。
+allowBuilds:
+  esbuild: true

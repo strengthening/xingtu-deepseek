@@ -1,0 +1,26 @@
+# 依赖与构建产物
+node_modules/
+dist/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# 原始数据（星表、星座连线原始文件、HiPS 瓦片等），体积大且可重新下载
+data/raw/
+
+# 预处理脚本生成的运行时数据（星表二进制分块、星名 JSON、HiPS 重投影贴图）
+public/data/
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+*.local
+.env
+.env.*
+!.env.example
+
+# pnpm 的内容寻址存储（沙箱环境下 pnpm 无法写入用户目录，会回退到项目内）
+.pnpm-store/
