@@ -153,10 +153,12 @@ export function createInitialState(): AppStateShape {
       timeZone: preset.timeZone,
     },
     view: {
-      // 默认朝南、抬头 40° —— 中纬度观测者最常看的方向
+      // 默认朝南、抬头 32°、垂直视场 80°。
+      // 这个组合下画面底部刚好带一点地平线与地面，一眼能看出
+      // 「这是从地面往天上看」，而不是飘在太空里的星图。
       azimuthDeg: 180,
-      altitudeDeg: 40,
-      fovDeg: 70,
+      altitudeDeg: 32,
+      fovDeg: 80,
     },
     time: {
       epochMs: Date.now(),

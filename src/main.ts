@@ -1,17 +1,34 @@
 /**
- * 应用入口：装配状态、星表、渲染器与交互。
+ * 应用入口：装配状态、数据、渲染器、UI 与交互。
+ *
+ * 这里只做「编排」：具体天文计算在 `astro/`、数据解析在 `data/`、
+ * 绘制在 `render/`、控件在 `ui/`。
  */
 
 import './styles.css';
 
+import { loadConstellations, type LoadedConstellationGroup } from './data/constellations';
 import { StarCatalog } from './data/starCatalog';
 import { SkyRenderer } from './render/skyRenderer';
-import { dragToAngles, normalizeViewAngles } from './render/viewCamera';
-import { computeSkyContext, horizonToEquatorial, type Viewport } from './skyContext';
+import {
+  buildCompassTicks,
+  buildEquatorialGrid,
+  buildHorizonLine,
+  buildHorizontalGrid,
+} from './render/grids';
+import { pickObjects } from './render/picking';
+import { dragToAngles, normalizeViewAngles, unprojectFromNdc } from './render/viewCamera';
+import { computeSkyContext, horizonToEquatorial, type SkyContext, type Viewport } from './skyContext';
+import { ControlPanel } from './ui/controls';
+import { formatMagnitude, formatRate, formatZonedDateTime } from './ui/format';
+import { InfoCard } from './ui/infoCard';
+import { LabelLayer } from './ui/labelLayer';
+import { copyShareLink, readStateFromUrl, syncUrl } from './url';
 import {
   AppState,
   clampFov,
   createInitialState,
+  findPreset,
   magnitudeLimitForFov,
   type AppStateShape,
 } from './state';
@@ -20,11 +37,15 @@ const canvasElement = document.getElementById('sky-canvas');
 const loadingOverlay = document.getElementById('loading-overlay');
 const loadingStatus = document.getElementById('loading-status');
 const loadingBar = document.getElementById('loading-bar-fill');
+const labelLayerElement = document.getElementById('label-layer');
+const uiRoot = document.getElementById('ui-root');
 
-if (!(canvasElement instanceof HTMLCanvasElement)) {
-  throw new Error('找不到 #sky-canvas');
-}
+if (!(canvasElement instanceof HTMLCanvasElement)) throw new Error('找不到 #sky-canvas');
+if (!labelLayerElement || !uiRoot) throw new Error('缺少 UI 容器');
 const canvas: HTMLCanvasElement = canvasElement;
+// 收窄成非空常量，闭包里才好用
+const labelRoot: HTMLElement = labelLayerElement;
+const overlayRoot: HTMLElement = uiRoot;
 
 function setLoading(message: string, fraction?: number): void {
   if (loadingStatus) loadingStatus.textContent = message;
@@ -39,31 +60,63 @@ function hideLoading(): void {
   window.setTimeout(() => loadingOverlay.remove(), 600);
 }
 
-/** 星等限：由视场角决定，并留一点余量给标签逻辑 */
-function currentMagnitudeLimit(state: AppStateShape): number {
-  return magnitudeLimitForFov(state.view.fovDeg);
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props: Partial<HTMLElementTagNameMap[K]> & { class?: string } = {},
+  children: (Node | string)[] = [],
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === 'class') node.className = String(value);
+    else if (key in node) (node as unknown as Record<string, unknown>)[key] = value;
+    else node.setAttribute(key, String(value));
+  }
+  for (const child of children) node.append(child);
+  return node;
+}
+
+interface Hud {
+  element: HTMLElement;
+  location: HTMLElement;
+  time: HTMLElement;
+  stats: HTMLElement;
+  notice: HTMLElement;
+}
+
+function buildHud(): Hud {
+  const location = el('div', { class: 'hud-line hud-line--strong' });
+  const time = el('div', { class: 'hud-line' });
+  const stats = el('div', { class: 'hud-line hud-line--dim' });
+  const notice = el('div', { class: 'hud-notice' });
+  notice.style.display = 'none';
+  const element = el('div', { class: 'panel hud' }, [location, time, stats, notice]);
+  return { element, location, time, stats, notice };
 }
 
 async function boot(): Promise<void> {
-  const state = new AppState(createInitialState());
+  // URL 参数优先，其余用默认值
+  const initial = { ...createInitialState(), ...readStateFromUrl(window.location.search) };
+  const state = new AppState(initial);
 
   let renderer: SkyRenderer;
   try {
     renderer = new SkyRenderer(canvas);
   } catch (err) {
     setLoading(
-      `无法初始化 WebGL：${err instanceof Error ? err.message : String(err)}。` +
-        `请确认浏览器已启用硬件加速。`,
+      `无法初始化 WebGL：${err instanceof Error ? err.message : String(err)}。请确认浏览器已启用硬件加速。`,
     );
     return;
   }
 
+  // -------------------------------------------------------------------------
+  // 数据加载
+  // -------------------------------------------------------------------------
+
   const catalog = new StarCatalog('data/stars/');
   setLoading('读取星表清单…', 0.05);
-  await catalog.load((message, fraction) => setLoading(message, 0.05 + fraction * 0.45));
+  await catalog.load((message, fraction) => setLoading(message, 0.05 + fraction * 0.4));
 
-  // 银河贴图是可选资源：拿不到就退化成没有银河，不影响其它功能
-  setLoading('读取银河背景…', 0.55);
+  setLoading('读取银河背景…', 0.5);
   try {
     const metaRes = await fetch('data/milkyway/meta.json');
     if (metaRes.ok) {
@@ -77,10 +130,82 @@ async function boot(): Promise<void> {
       ]);
     }
   } catch {
-    /* 忽略：没有银河贴图也能跑 */
+    /* 银河贴图是可选的 */
   }
 
-  setLoading('准备渲染…', 0.9);
+  setLoading('读取星座连线…', 0.65);
+  let constellationGroups: LoadedConstellationGroup[] = [];
+  let constellationErrors: string[] = [];
+  try {
+    const result = await loadConstellations('data/constellations/');
+    constellationGroups = result.groups;
+    constellationErrors = result.errors;
+  } catch (err) {
+    constellationErrors = [err instanceof Error ? err.message : String(err)];
+  }
+
+  // 中文星名（可选）
+  let chineseNames: Map<number, string> | null = null;
+  try {
+    const res = await fetch('data/constellations/chinese-star-names.json');
+    if (res.ok) {
+      const raw = (await res.json()) as Record<string, string>;
+      chineseNames = new Map(Object.entries(raw).map(([k, v]) => [Number(k), v]));
+    }
+  } catch {
+    chineseNames = null;
+  }
+
+  // -------------------------------------------------------------------------
+  // 线图层
+  // -------------------------------------------------------------------------
+
+  const lines = renderer.linesLayer;
+  lines.setLayer('eq-grid', buildEquatorialGrid(15, 15), {
+    color: 0x3f6f9f,
+    opacity: 0.34,
+    frame: 'eqj',
+    renderOrder: 3,
+    visible: initial.display.showEquatorialGrid,
+  });
+  lines.setLayer('hor-grid', buildHorizontalGrid(10, 15), {
+    color: 0x4f8f7f,
+    opacity: 0.3,
+    frame: 'hor',
+    renderOrder: 3,
+    visible: initial.display.showHorizontalGrid,
+  });
+  lines.setLayer('horizon', buildHorizonLine(), {
+    color: 0x9fbfe0,
+    opacity: 0.65,
+    frame: 'hor',
+    renderOrder: 4,
+    visible: initial.display.showHorizon,
+  });
+  lines.setLayer('compass-ticks', buildCompassTicks(), {
+    color: 0x7fa8d0,
+    opacity: 0.5,
+    frame: 'hor',
+    renderOrder: 4,
+    visible: initial.display.showHorizon,
+  });
+
+  for (const group of constellationGroups) {
+    const isWestern = group.id === 'western';
+    lines.setLayer(`constellation-${group.id}`, group.polylines, {
+      color: isWestern ? 0x5f7fa8 : 0xc79a5f,
+      opacity: isWestern ? 0.55 : 0.5,
+      frame: 'eqj',
+      renderOrder: 3,
+      visible: isWestern
+        ? initial.display.showWesternConstellations
+        : initial.display.showChineseConstellations,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // 视口与选块调度
+  // -------------------------------------------------------------------------
 
   let viewport: Viewport = { width: 1, height: 1, pixelRatio: 1 };
 
@@ -94,59 +219,138 @@ async function boot(): Promise<void> {
   }
 
   measure();
-  window.addEventListener('resize', () => {
-    measure();
-    needsPlan = true;
-  });
 
-  // -------------------------------------------------------------------------
-  // 选块调度
-  // -------------------------------------------------------------------------
+  const labels = new LabelLayer(labelRoot);
+  labels.setChineseNames(chineseNames);
 
   let needsPlan = true;
   let lastPlanAt = 0;
-  let magnitudeLimit = currentMagnitudeLimit(state.value);
+  let currentCtx: SkyContext = computeSkyContext(state.value, viewport);
 
   function refreshPlan(force = false): void {
     const now = performance.now();
-    // 选块不必每帧做：视野没变时结果一样
-    if (!force && now - lastPlanAt < 180) return;
+    if (!force && now - lastPlanAt < 150) return;
     lastPlanAt = now;
 
-    const ctx = computeSkyContext(state.value, viewport);
-    const centerEqj = horizonToEquatorial(ctx, ctx.centerHorizon);
+    currentCtx = computeSkyContext(state.value, viewport);
+    const centerEqj = horizonToEquatorial(currentCtx, currentCtx.centerHorizon);
     const plan = catalog.plan(
-      { centerEqj, fovDeg: ctx.fovDeg, aspect: ctx.aspect },
-      ctx.equToHoriz,
+      { centerEqj, fovDeg: currentCtx.fovDeg, aspect: currentCtx.aspect },
+      currentCtx.equToHoriz,
     );
     catalog.apply(plan);
-
-    magnitudeLimit = currentMagnitudeLimit(state.value);
-    renderer.setMagnitudeLimit(magnitudeLimit);
+    renderer.setMagnitudeLimit(magnitudeLimitForFov(state.value.view.fovDeg));
   }
 
   catalog.onChunksChanged = () => {
     renderer.syncStars(catalog.residentChunksByTier(['A', 'B', 'C', 'D']));
+    labels.invalidate();
   };
 
-  refreshPlan(true);
-  renderer.syncStars(catalog.residentChunksByTier(['A', 'B', 'C', 'D']));
+  // -------------------------------------------------------------------------
+  // UI
+  // -------------------------------------------------------------------------
+
+  const infoCard = new InfoCard();
+  const hud = buildHud();
+
+  let urlTimer = 0;
+  function scheduleUrlSync(): void {
+    window.clearTimeout(urlTimer);
+    urlTimer = window.setTimeout(() => syncUrl(state.value), 400);
+  }
+
+  let noticeTimer = 0;
+  function showNotice(text: string, durationMs = 3200): void {
+    hud.notice.textContent = text;
+    hud.notice.style.display = '';
+    window.clearTimeout(noticeTimer);
+    noticeTimer = window.setTimeout(() => {
+      hud.notice.style.display = 'none';
+    }, durationMs);
+  }
+
+  const controlPanel = new ControlPanel(state, {
+    onLocationChange: (locationId) => {
+      const preset = findPreset(locationId);
+      state.update({
+        observer: {
+          locationId: preset.id,
+          locationName: preset.name,
+          latitudeDeg: preset.latitudeDeg,
+          longitudeDeg: preset.longitudeDeg,
+          heightM: preset.heightM,
+          timeZone: preset.timeZone,
+        },
+      });
+      needsPlan = true;
+      scheduleUrlSync();
+    },
+    onTimeChange: (epochMs) => {
+      state.update({ time: { epochMs } });
+      needsPlan = true;
+      scheduleUrlSync();
+    },
+    onNow: () => {
+      state.update({ time: { epochMs: Date.now() } });
+      needsPlan = true;
+      scheduleUrlSync();
+    },
+    onResetView: () => {
+      state.update({ view: { azimuthDeg: 180, altitudeDeg: 40, fovDeg: 70 } });
+      needsPlan = true;
+      scheduleUrlSync();
+    },
+    onShare: () => {
+      void copyShareLink(state.value).then((ok) => {
+        showNotice(ok ? '分享链接已复制到剪贴板' : '已弹出分享链接');
+      });
+    },
+  });
+
+  overlayRoot.append(controlPanel.element, hud.element, infoCard.element);
+  overlayRoot.appendChild(
+    el('div', { class: 'hint-bar' }, [
+      el('span', {}, ['拖拽转视角 · 滚轮缩放 · 单击天体查看信息 · 空格暂停时间 · N 回到现在']),
+    ]),
+  );
+
+  if (constellationErrors.length > 0) {
+    showNotice(`星座连线未加载：${constellationErrors[0]}`, 9000);
+  }
+
+  // 状态 → 图层可见性
+  state.subscribe((next) => {
+    lines.setVisible('eq-grid', next.display.showEquatorialGrid);
+    lines.setVisible('hor-grid', next.display.showHorizontalGrid);
+    lines.setVisible('horizon', next.display.showHorizon);
+    lines.setVisible('compass-ticks', next.display.showHorizon);
+    lines.setVisible('constellation-western', next.display.showWesternConstellations);
+    lines.setVisible('constellation-chinese', next.display.showChineseConstellations);
+  });
 
   // -------------------------------------------------------------------------
-  // 交互：拖拽转视角、滚轮缩放
+  // 交互
   // -------------------------------------------------------------------------
 
   let dragging = false;
+  let dragMoved = 0;
   let lastX = 0;
   let lastY = 0;
   const activePointers = new Map<number, { x: number; y: number }>();
   let pinchDistance = 0;
 
   canvas.addEventListener('pointerdown', (event) => {
-    canvas.setPointerCapture(event.pointerId);
+    // 合成事件（自动化测试）可能带一个不存在的 pointerId，捕获会抛异常
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      /* 忽略：非真实指针事件 */
+    }
     activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activePointers.size === 1) {
       dragging = true;
+      dragMoved = 0;
       lastX = event.clientX;
       lastY = event.clientY;
     } else if (activePointers.size === 2) {
@@ -163,9 +367,9 @@ async function boot(): Promise<void> {
     if (activePointers.size >= 2) {
       const dist = pointerDistance();
       if (pinchDistance > 0 && dist > 0) {
-        const scale = pinchDistance / dist;
-        state.update({ view: { fovDeg: clampFov(state.value.view.fovDeg * scale) } });
+        state.update({ view: { fovDeg: clampFov(state.value.view.fovDeg * (pinchDistance / dist)) } });
         needsPlan = true;
+        scheduleUrlSync();
       }
       pinchDistance = dist;
       return;
@@ -176,29 +380,18 @@ async function boot(): Promise<void> {
     const dy = event.clientY - lastY;
     lastX = event.clientX;
     lastY = event.clientY;
+    dragMoved += Math.hypot(dx, dy);
 
     const { azimuthDeg, altitudeDeg } = state.value.view;
     const delta = dragToAngles(dx, dy, viewport.height, state.value.view.fovDeg, altitudeDeg);
-    const next = normalizeViewAngles(azimuthDeg + delta.deltaAzimuthDeg, altitudeDeg + delta.deltaAltitudeDeg);
+    const next = normalizeViewAngles(
+      azimuthDeg + delta.deltaAzimuthDeg,
+      altitudeDeg + delta.deltaAltitudeDeg,
+    );
     state.update({ view: { azimuthDeg: next.azimuthDeg, altitudeDeg: next.altitudeDeg } });
     needsPlan = true;
+    scheduleUrlSync();
   });
-
-  function endPointer(event: PointerEvent): void {
-    activePointers.delete(event.pointerId);
-    if (activePointers.size === 0) {
-      dragging = false;
-      canvas.classList.remove('is-dragging');
-    } else if (activePointers.size === 1) {
-      const remaining = [...activePointers.values()][0]!;
-      dragging = true;
-      lastX = remaining.x;
-      lastY = remaining.y;
-    }
-  }
-
-  canvas.addEventListener('pointerup', endPointer);
-  canvas.addEventListener('pointercancel', endPointer);
 
   function pointerDistance(): number {
     const pts = [...activePointers.values()];
@@ -208,23 +401,120 @@ async function boot(): Promise<void> {
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
+  function endPointer(event: PointerEvent): void {
+    activePointers.delete(event.pointerId);
+    if (activePointers.size === 0) {
+      canvas.classList.remove('is-dragging');
+      // 位移很小才算点击，避免拖完视角后误触发点选
+      if (dragging && dragMoved < 5) handleClick(event.clientX, event.clientY);
+      dragging = false;
+    } else if (activePointers.size === 1) {
+      const remaining = [...activePointers.values()][0]!;
+      dragging = true;
+      lastX = remaining.x;
+      lastY = remaining.y;
+    }
+  }
+
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', (event) => {
+    activePointers.delete(event.pointerId);
+    if (activePointers.size === 0) {
+      dragging = false;
+      canvas.classList.remove('is-dragging');
+    }
+  });
+
+  function handleClick(clientX: number, clientY: number): void {
+    const rect = canvas.getBoundingClientRect();
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
+
+    const dirHorizon = unprojectFromNdc(
+      ndcX,
+      ndcY,
+      currentCtx.camera,
+      currentCtx.fovDeg,
+      currentCtx.aspect,
+    );
+    if (dirHorizon.z < -0.02) {
+      infoCard.hide();
+      return;
+    }
+    const dirEqj = horizonToEquatorial(currentCtx, dirHorizon);
+
+    const { pick } = pickObjects(
+      catalog.residentChunksByTier(['A', 'B', 'C', 'D']),
+      currentCtx.bodies,
+      dirEqj,
+      dirHorizon,
+      currentCtx.fovDeg,
+      catalog,
+    );
+
+    if (!pick) {
+      infoCard.hide();
+      return;
+    }
+    if (pick.kind === 'body') infoCard.showBody(pick, currentCtx);
+    else infoCard.showStar(pick, currentCtx, catalog, { chineseNames });
+  }
+
   canvas.addEventListener(
     'wheel',
     (event) => {
       event.preventDefault();
-      // 向上滚 = 放大（视场角变小）
       const factor = Math.exp(event.deltaY * 0.0012);
       state.update({ view: { fovDeg: clampFov(state.value.view.fovDeg * factor) } });
       needsPlan = true;
+      scheduleUrlSync();
     },
     { passive: false },
   );
 
   window.addEventListener('keydown', (event) => {
-    if (event.key === ' ') {
-      event.preventDefault();
-      state.update({ time: { paused: !state.value.time.paused } });
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT')) return;
+
+    switch (event.key) {
+      case ' ':
+        event.preventDefault();
+        state.update({ time: { paused: !state.value.time.paused } });
+        break;
+      case 'Escape':
+        infoCard.hide();
+        break;
+      case 'n':
+      case 'N':
+        state.update({ time: { epochMs: Date.now() } });
+        needsPlan = true;
+        break;
+      case 'c':
+      case 'C':
+        state.update({
+          display: { showWesternConstellations: !state.value.display.showWesternConstellations },
+        });
+        break;
+      case 'g':
+      case 'G':
+        state.update({ display: { showEquatorialGrid: !state.value.display.showEquatorialGrid } });
+        break;
+      case 'h':
+      case 'H':
+        state.update({ display: { showHorizontalGrid: !state.value.display.showHorizontalGrid } });
+        break;
+      case 'l':
+      case 'L':
+        state.update({ display: { showStarLabels: !state.value.display.showStarLabels } });
+        break;
+      default:
+        break;
     }
+  });
+
+  window.addEventListener('resize', () => {
+    measure();
+    needsPlan = true;
   });
 
   // -------------------------------------------------------------------------
@@ -234,6 +524,7 @@ async function boot(): Promise<void> {
   let lastFrameAt = performance.now();
   let fpsAccum = 0;
   let fpsFrames = 0;
+  let fps = 0;
 
   function frame(now: number): void {
     const dtMs = Math.min(now - lastFrameAt, 250);
@@ -242,22 +533,38 @@ async function boot(): Promise<void> {
     const current = state.value;
     if (!current.time.paused && current.time.rate !== 0) {
       state.update({ time: { epochMs: current.time.epochMs + dtMs * current.time.rate } });
+      // 时间快速流动时天球会转，选块需要跟着更新
+      if (Math.abs(current.time.rate) > 3600) needsPlan = true;
     }
 
     refreshPlan(needsPlan);
     needsPlan = false;
 
-    const ctx = computeSkyContext(state.value, viewport);
-    const stats = renderer.render(ctx, state.value);
+    currentCtx = computeSkyContext(state.value, viewport);
+    const chunks = catalog.residentChunksByTier(['A', 'B', 'C', 'D']);
+    const stats = renderer.render(currentCtx, state.value);
+
+    labels.update(currentCtx, state.value, chunks, catalog, now);
 
     fpsAccum += dtMs;
     fpsFrames++;
-    if (fpsAccum > 500) {
-      const fps = (fpsFrames * 1000) / fpsAccum;
-      window.dispatchEvent(new CustomEvent('xingtu:stats', { detail: { ...stats, fps } }));
+    if (fpsAccum >= 500) {
+      fps = (fpsFrames * 1000) / fpsAccum;
       fpsAccum = 0;
       fpsFrames = 0;
     }
+
+    const preset = findPreset(state.value.observer.locationId);
+    hud.location.textContent =
+      `${preset.name} · ${preset.latitudeDeg.toFixed(2)}°, ${preset.longitudeDeg.toFixed(2)}°`;
+    hud.time.textContent =
+      `${formatZonedDateTime(currentCtx.date, preset.timeZone)}` +
+      `${state.value.time.paused ? ' · 已暂停' : ` · ${formatRate(state.value.time.rate)}`}`;
+    hud.stats.textContent =
+      `视场 ${state.value.view.fovDeg < 10 ? state.value.view.fovDeg.toFixed(2) : state.value.view.fovDeg.toFixed(1)}°` +
+      ` · 显示至 ${formatMagnitude(magnitudeLimitForFov(state.value.view.fovDeg))}` +
+      ` · 已载入 ${stats.stars.toLocaleString()} / ${catalog.totalStars.toLocaleString()} 颗` +
+      ` · ${stats.chunks} 块 · ${fps.toFixed(0)} FPS`;
 
     requestAnimationFrame(frame);
   }
@@ -266,9 +573,8 @@ async function boot(): Promise<void> {
   hideLoading();
   requestAnimationFrame(frame);
 
-  // 供调试与后续 UI 使用
   Object.assign(window as unknown as Record<string, unknown>, {
-    __xingtu: { state, renderer, catalog },
+    __xingtu: { state, renderer, catalog, lines, labels, infoCard, ctx: () => currentCtx },
   });
 }
 
@@ -276,3 +582,6 @@ boot().catch((err: unknown) => {
   setLoading(`启动失败：${err instanceof Error ? err.message : String(err)}`);
   console.error(err);
 });
+
+/** 让类型检查确认导出被引用（供将来的模块使用） */
+export type { AppStateShape };

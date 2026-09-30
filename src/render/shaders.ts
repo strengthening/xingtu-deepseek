@@ -415,6 +415,9 @@ varying vec2 vUv;
 
 void main() {
   vec3 linear = texture2D(uScene, vUv).rgb * uExposure;
+  // 防御性钳制：任何 Inf / 超大值都会让色调映射产出 NaN，最后渲染成黑色，
+  // 而现象看起来更像是「什么都没画」，很难反查。
+  linear = clamp(linear, vec3(0.0), vec3(60000.0));
   gl_FragColor = vec4(linearToSrgb(tonemap(linear)), 1.0);
 }
 `;

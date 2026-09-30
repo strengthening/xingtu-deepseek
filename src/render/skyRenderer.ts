@@ -37,6 +37,15 @@ import { StarField } from './starField';
 import { limbDirectionOf, type SkyContext } from '../skyContext';
 import { writeGlslMat3 } from './glslUniforms';
 
+/**
+ * 天光从「物理相对通量」换到 HDR 缓冲里的曝光系数。
+ * 暗夜天光（相对通量 1）映射到 0.010，屏幕上接近纯黑但保留一点夜色的层次。
+ */
+const SKY_EXPOSURE = 0.01;
+
+/** HDR 缓冲里的天光上限。HalfFloat 上限 65504，这里远低于它，留足余量。 */
+const SKY_HDR_LIMIT = 30;
+
 export interface RendererStats {
   chunks: number;
   stars: number;
@@ -180,27 +189,43 @@ export class SkyRenderer {
     writeGlslMat3(u.uCamToEqu.value as Float32Array, this.camToEquScratch);
 
     // ---- 天光三要素 ----
-    // CPU 侧算的是「视线中心方向」的亮度，着色器再叠加方向性（靠近月亮更亮、
-    // 靠近地平线更亮）。
+    // CPU 侧算的是「视线中心方向」的亮度（以暗夜天光为 1），
+    // 着色器再叠加方向性（靠近月亮更亮、靠近地平线更亮）。
     const glow = ctx.skyGlow;
     const density = state.display.showAtmosphere ? state.display.atmosphereDensity : 0;
     const relative = Number.isFinite(glow.relativeFlux) ? glow.relativeFlux : 0;
 
-    // 暗夜天光的绝对量级刻意压得很低，否则会把星星淹没
-    u.uSkyNight.value = 0.018 * Math.min(relative, 3);
-    u.uSkyTwilight.value = glow.twilightFraction * relative * 0.35;
-    u.uSkyMoon.value = glow.moonFraction * relative * 0.30;
     (u.uMoonDirHoriz.value as Float32Array).set([
       ctx.moon.horizon.x,
       ctx.moon.horizon.y,
       ctx.moon.horizon.z,
     ]);
 
-    // 大气浓度为 0 时天光消失（等价于太空视角）
     if (density <= 0) {
+      // 大气浓度为 0 等价于太空视角：没有天光，也没有消光
       u.uSkyNight.value = 0;
       u.uSkyTwilight.value = 0;
       u.uSkyMoon.value = 0;
+    } else {
+      // ⚠️ 这里必须钳制，不能把物理亮度直接写进缓冲。
+      //
+      // 天光的动态范围极其夸张：暗夜天光约 21.9 mag/arcsec²，正午约 −6，
+      // 相对通量差到 10^11 量级；而渲染目标是 HalfFloat，上限只有 65504。
+      // 直接写进去会溢出成 Inf，再经色调映射变成 NaN，整片天空渲染成黑色
+      // （而不是亮的），非常难从现象反推原因。
+      //
+      // 用「以暗夜天光为基准的比例 × 固定曝光」再夹到上限：
+      // 暗夜 ≈ 0.010（屏幕上接近黑），满月 ≈ 0.36（灰蓝），
+      // 暮光与白天迅速顶到上限，经色调映射后成为明亮的天空。
+      u.uSkyNight.value = Math.min(relative, 3) * SKY_EXPOSURE;
+      u.uSkyTwilight.value = Math.min(
+        (glow.twilightFraction * relative) * SKY_EXPOSURE,
+        SKY_HDR_LIMIT,
+      );
+      u.uSkyMoon.value = Math.min(
+        (glow.moonFraction * relative) * SKY_EXPOSURE,
+        SKY_HDR_LIMIT,
+      );
     }
 
     this.background.setMilkyWayEnabled(state.display.showMilkyWay);

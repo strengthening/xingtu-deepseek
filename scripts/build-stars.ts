@@ -208,7 +208,14 @@ class ChunkAccumulator {
     const pmOff = rgbaOff + n * 4;
     const idOff = pmOff + n * 8;
 
-    u8.set(new Uint8Array(this.pos.buffer, 0, n * 3), posOff);
+    // ⚠️ 单位陷阱：`Uint8Array` 构造函数的第三个参数是**字节数**，
+    // 而 positions 每颗星占 3 个 float32 = 12 字节。写成 `n * 3` 的话
+    // 只会拷进 1/4 的数据，剩下 3/4 的位置保持默认的零向量；
+    // 零向量在顶点着色器里 `normalize()` 得到 NaN，那些星会静默消失 ——
+    // 不报错、不崩溃，只是「天上少了四分之三的星」，非常难发现。
+    // 其它几段的「每星字节数」恰好等于「每星元素个数」（mags 4、pm 8、ids 4），
+    // 所以只有这一行会踩坑。
+    u8.set(new Uint8Array(this.pos.buffer, 0, n * 12), posOff);
     u8.set(new Uint8Array(this.mag.buffer, 0, n * 4), magOff);
     u8.set(this.rgba.subarray(0, n * 4), rgbaOff);
     u8.set(new Uint8Array(this.pm.buffer, 0, n * 8), pmOff);
@@ -307,9 +314,16 @@ interface TierStat {
   files: TileStat[];
 }
 
+/**
+ * B-V → 单字节编码：`round((bv + 0.5) × 50)`，值域 0..255 覆盖 −0.5 .. +4.6。
+ *
+ * **0 是「星表没有收录色指数」的哨兵值**（真实的 B-V 不会低到 −0.5，
+ * 最蓝的 O 型星也只有约 −0.33）。这样信息卡可以如实显示「—」而不是
+ * 把兜底的太阳色当成观测值。
+ */
 function bvCode(bv: number | null): number {
-  const v = bv === null ? DEFAULT_BV : bv;
-  return Math.max(0, Math.min(255, Math.round((v + 0.5) * 50)));
+  if (bv === null) return 0;
+  return Math.max(1, Math.min(255, Math.round((bv + 0.5) * 50)));
 }
 
 async function* readCatalogLines(): AsyncGenerator<{ line: string; index: number }> {
@@ -455,6 +469,35 @@ async function main(): Promise<void> {
   // ---- 落盘 ----
   mkdirSync(OUT_DIR, { recursive: true });
 
+  // ---- 落盘前的自检 ----
+  // 位置必须是单位向量。历史上这里出过一次「字节数写成元素个数」的 bug，
+  // 结果 3/4 的星位置是零向量、在着色器里被 normalize 成 NaN 而静默消失。
+  // 加一道最便宜的断言，让这类错误立刻暴露。
+  let nonUnitPositions = 0;
+  let worstPositionError = 0;
+  for (const tileMap of buckets.values()) {
+    for (const acc of tileMap.values()) {
+      for (let i = 0; i < acc.count; i++) {
+        const len = Math.hypot(
+          acc.pos[i * 3]!,
+          acc.pos[i * 3 + 1]!,
+          acc.pos[i * 3 + 2]!,
+        );
+        const err = Math.abs(len - 1);
+        if (err > 1e-4) {
+          nonUnitPositions++;
+          if (err > worstPositionError) worstPositionError = err;
+        }
+      }
+    }
+  }
+  if (nonUnitPositions > 0) {
+    throw new Error(
+      `自检失败：有 ${nonUnitPositions.toLocaleString()} 颗星的位置不是单位向量` +
+        `（最大偏差 ${worstPositionError.toExponential(3)}）。请检查坐标换算与序列化。`,
+    );
+  }
+
   const tierStats: TierStat[] = [];
   let grandTotal = 0;
   let grandBytes = 0;
@@ -580,6 +623,7 @@ async function main(): Promise<void> {
   process.stdout.write('\n================ 汇总 ================\n');
   process.stdout.write(`  星表总星数        : ${grandTotal.toLocaleString()}\n`);
   process.stdout.write(`  过滤掉的 Sol      : ${skippedSol}\n`);
+  process.stdout.write(`  单位向量自检      : ✔ ${grandTotal.toLocaleString()} 颗全部通过\n`);
   process.stdout.write(`  缺 B-V 的星        : ${missingCi.toLocaleString()}（用太阳色 0.65 兜底）\n`);
   process.stdout.write(`  缺自行的星         : ${missingPm.toLocaleString()}\n`);
   process.stdout.write(`  有专名的星         : ${withProperName.toLocaleString()}\n`);
