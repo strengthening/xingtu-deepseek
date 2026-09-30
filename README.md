@@ -66,6 +66,79 @@ pnpm build          # 生产构建
 pnpm preview        # 预览生产构建
 ```
 
+## 部署到 GitHub Pages
+
+仓库里带了 [.github/workflows/deploy-pages.yml](.github/workflows/deploy-pages.yml)，
+推到 `main` 就自动构建并发布，也可以在 Actions 页面手动触发。
+
+### 首次使用要手动开一次
+
+**Settings → Pages → Build and deployment → Source 选 `GitHub Actions`。**
+
+> ⚠️ 别选成 `Deploy from a branch / docs`。本仓库有个 `docs/` 目录，
+> 但那是精度文档和截图，不是站点产物。选错了会看到一个只有两张文件的页面。
+
+开启后推一次代码，站点会发布到 `https://<用户名>.github.io/<仓库名>/`。
+
+### 流水线要解决的两个问题
+
+**一、数据不在仓库里。** `public/data/` 有 89 MB、`data/raw/` 有 194 MB，
+都按 AGENTS.md 的要求进了 `.gitignore`；而 Pages 只能服务仓库里的文件。
+所以流水线在 CI 里把数据重新生成一遍：
+
+```
+pnpm run data:download   # 194 MB，用 actions/cache 长期缓存，第二次起跳过
+pnpm run data:stars      # 约 5 秒
+pnpm run data:constellations
+pnpm run data:hips       # 从 CDS 现拉，continue-on-error
+pnpm run build
+```
+
+`data:hips`（银河贴图）这一步挂了不会拦住部署 —— 程序在没有银河贴图时
+会自动降级，只是天上少了银河。这样 CDS 服务抖动不会让你发不了版。
+
+**二、项目页挂在子路径下。** 站点地址是 `https://<用户名>.github.io/<仓库名>/`
+而不是域名根目录。如果还用 Vite 默认的 `base: '/'`，打包出来的
+`/assets/xxx.js` 会被解析到域名根目录，**整站白屏**。
+
+工作流里通过环境变量注入正确的 base：
+
+```bash
+VITE_BASE=/<仓库名>/ pnpm run build
+```
+
+`VITE_BASE` 是从 `github.event.repository.name` 动态拼的，仓库改名不用改配置。
+本地开发不设这个变量，保持 `/`。运行时拉取的数据（`data/stars/manifest.json` 等）
+本来就都是相对路径，会跟着页面 URL 走，不需要额外处理。
+
+### 本地验证项目页构建
+
+部署前可以自己验一遍，不用等 CI：
+
+```bash
+VITE_BASE=/xingtu-deepseek/ pnpm run build
+VITE_BASE=/xingtu-deepseek/ pnpm run preview
+# 打开 http://127.0.0.1:4173/xingtu-deepseek/
+```
+
+### 体积与配额
+
+发布产物约 **93 MB**（其中 3842 个 `.bin` 分块占大头）。GitHub Pages 的限制是
+单站 1 GB、每月 100 GB 流量，都在安全范围内。
+
+### 关于银河贴图的许可证
+
+再说一次，因为公开部署会放大这个问题：`CDS/P/Mellinger/color`
+是 **All rights reserved**，把它放进公开站点属于再分发。如果这不适合你的用途，
+删掉工作流里的 `预处理银河背景` 那一步就行 —— 原始数据缓存已经存下 194 MB，
+后续不需要重新下载，程序会自动降级为没有银河。
+
+### 换成别的静态托管
+
+产物是纯静态的（`dist/` 目录），不放 `data/raw/` 与 `public/data/` 的话
+任何静态托管都能用。要注意两点：一是仍需提供 `public/data/` 里的数据，
+二是如果用子路径访问，构建时要带上 `VITE_BASE`。
+
 ## 架构
 
 ```

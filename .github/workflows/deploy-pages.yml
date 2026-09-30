@@ -1,0 +1,145 @@
+name: Deploy to GitHub Pages
+
+# 部署到 GitHub Pages（项目页）：https://<用户名>.github.io/<仓库名>/
+#
+# 这条流水线要解决三件事：
+#
+# 1. **数据不在仓库里**。public/data/ 有 89 MB、data/raw/ 有 194 MB，
+#    都按 AGENTS.md 的要求进了 .gitignore。而 Pages 只能服务仓库里的文件，
+#    所以必须在这里把数据重新生成一遍。原始数据用 actions/cache 缓存住，
+#    之后每次部署就省掉那 194 MB 的下载。
+#
+# 2. **路径前缀**。项目页挂在 /<仓库名>/ 下面而不是域名根目录，
+#    所以构建时要用 VITE_BASE 告诉 Vite；否则打包出来的 /assets/xxx.js
+#    会被解析到域名根目录，整站白屏。运行时拉取的数据本来就是相对路径，
+#    不需要额外处理。
+#
+# 3. **首次使用需要手动开一次 Pages**：
+#    Settings → Pages → Build and deployment → Source 选 **GitHub Actions**。
+#    ⚠️ 注意别选成 "Deploy from a branch / docs" —— 本仓库有个 docs/ 目录，
+#    但那是精度文档和截图，不是站点产物。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GITHUB_TOKEN 的最小权限：读仓库 + 写 Pages + 取 OIDC 令牌
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署；main 上连续推送时取消排队中的旧任务
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  # 项目页的子路径。用仓库名动态拼，仓库改名也不用动这里。
+  VITE_BASE: /${{ github.event.repository.name }}/
+
+jobs:
+  build:
+    name: 生成数据并构建
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # 版本从这个字段读，不写死在这里，本地与 CI 不会漂
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      # 先跑质量门禁。这几步都不依赖数据，失败得快，不用浪费一次 200 MB 下载。
+      - name: 类型检查
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: 单元测试
+        run: pnpm test
+
+      # ---------------------------------------------------------------- 数据
+      # 原始数据（194 MB）内容不随时间变化，用固定 key 长期缓存。
+      # 将来换数据源时把 key 里的版本号改一下即可失效。
+      - name: 恢复原始数据缓存
+        id: raw-cache
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: xingtu-raw-data-athyg-v3.2-stellarium-v1
+
+      - name: 下载原始数据
+        # 缓存命中时脚本会自己发现文件已完整并直接跳过，不会重复下载
+        run: pnpm run data:download
+
+      - name: 预处理星表
+        run: pnpm run data:stars
+
+      - name: 预处理星座连线
+        run: pnpm run data:constellations
+
+      # 银河贴图要从 CDS 的 hips2fits 服务现拉。这是外部依赖，
+      # 挂掉不应该拦住整个部署 —— 程序在没有银河贴图时会自动降级
+      # （BackgroundLayer 加载失败就把 uHasMilkyWay 置 0）。
+      #
+      # ⚠️ 许可证提醒：这张贴图（Axel Mellinger 全天银河全景）是
+      # All rights reserved，不是自由许可证。公开部署前请确认这符合你的用途；
+      # 要禁用的话，先跑一次 `pnpm run data:download` 生成 data/raw/，
+      # 然后删掉本步骤 —— 缓存已经存下原始数据，后续不需要重新下载。
+      - name: 预处理银河背景
+        continue-on-error: true
+        run: pnpm run data:hips
+
+      # ---------------------------------------------------------------- 构建
+      - name: 构建站点
+        run: pnpm run build
+
+      - name: 打印产物体积
+        run: |
+          echo "=== dist 总体积 ==="
+          du -sh dist
+          echo
+          echo "=== 主要目录 ==="
+          du -sh dist/data/stars dist/data/constellations dist/data/milkyway dist/assets 2>/dev/null || true
+          echo
+          echo "=== 数据分块数量 ==="
+          find dist/data/stars -name '*.bin' | wc -l
+
+      - name: 关闭 Jekyll 处理
+        # Actions 方式的 Pages 部署本来就不走 Jekyll，这里只是加一道保险：
+        # 万一以后改成「从分支部署」，下划线开头的文件名不会被吞掉。
+        run: touch dist/.nojekyll
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+          retention-days: 1
+
+  deploy:
+    name: 发布
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

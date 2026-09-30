@@ -5,6 +5,7 @@
   "type": "module",
   "description": "浏览器端星空 / 天象仪（Stellarium Web 风格）",
   "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
